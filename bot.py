@@ -1,7 +1,6 @@
 import os
 import json
 import logging
-from flask import Flask, request
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -16,9 +15,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
-# Flask App for Render Web Service
-app = Flask(__name__)
 
 # Bot Configurations
 TOKEN = os.getenv("BOT_TOKEN")
@@ -188,37 +184,33 @@ async def owner_groups_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_groups = len(groups)
     await update.message.reply_text(f"📊 Total active groups where bot is added: **{total_groups}**")
 
-# --- Telegram Application Setup ---
-application = Application.builder().token(TOKEN).build()
+def main():
+    # Build application
+    application = Application.builder().token(TOKEN).build()
 
-application.add_handler(CommandHandler("start", start_command))
-application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, new_member_handler))
-application.add_handler(CommandHandler("setwelcome", set_welcome_command))
-application.add_handler(CommandHandler("welcomebot", toggle_welcome_command))
-application.add_handler(CommandHandler("broadcast", owner_broadcast))
-application.add_handler(CommandHandler("groups", owner_groups_list))
+    # Handlers add karein
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, new_member_handler))
+    application.add_handler(CommandHandler("setwelcome", set_welcome_command))
+    application.add_handler(CommandHandler("welcomebot", toggle_welcome_command))
+    application.add_handler(CommandHandler("broadcast", owner_broadcast))
+    application.add_handler(CommandHandler("groups", owner_groups_list))
 
-# --- Flask Routes ---
-@app.route('/')
-def home():
-    return "Telegram Welcome Bot is running live via Webhook!"
+    # Render Environment se Port aur URL lena
+    PORT = int(os.environ.get("PORT", 10000))
+    RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")
 
-@app.route(f'/{TOKEN}', methods=['POST'])
-def webhook():
-    """ Telegram updates ko receive karke bot ko pass karega """
-    update = Update.de_json(request.get_json(force=True), application.bot)
-    application.update_queue.put(update)
-    return 'ok', 200
+    if RENDER_URL:
+        # Native Webhook Server start karega jo Render ke liye perfect hai
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            url_path=TOKEN,
+            webhook_url=f"{RENDER_URL}/{TOKEN}"
+        )
+    else:
+        # Local testing ke liye fallback polling
+        application.run_polling()
 
 if __name__ == "__main__":
-    # Render par webhook automatically set karne ke liye code
-    PORT = int(os.environ.get("PORT", 10000))
-    
-    # Render ka live URL detect karna (agar RENDER_EXTERNAL_URL available ho)
-    RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")
-    if RENDER_URL:
-        webhook_url = f"{RENDER_URL}/{TOKEN}"
-        application.bot.set_webhook(url=webhook_url)
-        logger.info(f"Webhook set to: {webhook_url}")
-
-    app.run(host="0.0.0.0", port=PORT)
+    main()
