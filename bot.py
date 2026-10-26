@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+import threading
+from flask import Flask
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -15,6 +17,13 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Flask App for Render Port Binding (Web Service Requirement)
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Telegram Welcome Bot is active and running!"
 
 # Bot Configurations
 TOKEN = os.getenv("BOT_TOKEN")
@@ -184,7 +193,17 @@ async def owner_groups_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_groups = len(groups)
     await update.message.reply_text(f"📊 Total active groups where bot is added: **{total_groups}**")
 
+def run_flask_server():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, use_reloader=False)
+
 def main():
+    # 1. Flask ko background thread me chalayein taaki Render ka port busy rahe
+    flask_thread = threading.Thread(target=run_flask_server, daemon=True)
+    flask_thread.start()
+    logger.info("Flask server started in background for Render port binding.")
+
+    # 2. Telegram Bot ko Main Thread me Polling par chalayein (100% Stable)
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start_command))
@@ -194,18 +213,8 @@ def main():
     application.add_handler(CommandHandler("broadcast", owner_broadcast))
     application.add_handler(CommandHandler("groups", owner_groups_list))
 
-    PORT = int(os.environ.get("PORT", 10000))
-    RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")
-
-    if RENDER_URL:
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            url_path=TOKEN,
-            webhook_url=f"{RENDER_URL}/{TOKEN}"
-        )
-    else:
-        application.run_polling()
+    logger.info("Bot polling started...")
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
