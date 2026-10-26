@@ -185,10 +185,8 @@ async def owner_groups_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📊 Total active groups where bot is added: **{total_groups}**")
 
 def main():
-    # Build application
     application = Application.builder().token(TOKEN).build()
 
-    # Handlers add karein
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, new_member_handler))
     application.add_handler(CommandHandler("setwelcome", set_welcome_command))
@@ -196,12 +194,10 @@ def main():
     application.add_handler(CommandHandler("broadcast", owner_broadcast))
     application.add_handler(CommandHandler("groups", owner_groups_list))
 
-    # Render Environment se Port aur URL lena
     PORT = int(os.environ.get("PORT", 10000))
     RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")
 
     if RENDER_URL:
-        # Native Webhook Server start karega jo Render ke liye perfect hai
         application.run_webhook(
             listen="0.0.0.0",
             port=PORT,
@@ -209,7 +205,6 @@ def main():
             webhook_url=f"{RENDER_URL}/{TOKEN}"
         )
     else:
-        # Local testing ke liye fallback polling
         application.run_polling()
 
 if __name__ == "__main__":
